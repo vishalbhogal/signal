@@ -52,7 +52,6 @@ nonisolated enum DashboardSection: Int, CaseIterable, Sendable {
 nonisolated enum DashboardItem: Hashable, Sendable {
     case riskScore(BurnoutRiskScore)
     case stat(StatItem)
-    case chart([DailyHealthSnapshot])
     case insight(HealthInsight)
     case exploreSpot(ExploreSpot)
 }
@@ -111,7 +110,6 @@ final class DashboardViewController: UIViewController {
         // Registering with a type (not a nib) means no separate .xib files needed.
         cv.register(RiskScoreCell.self, forCellWithReuseIdentifier: RiskScoreCell.reuseID)
         cv.register(StatCell.self, forCellWithReuseIdentifier: StatCell.reuseID)
-        cv.register(ChartCell.self, forCellWithReuseIdentifier: ChartCell.reuseID)
         cv.register(InsightCell.self, forCellWithReuseIdentifier: InsightCell.reuseID)
         cv.register(ExploreSpotCell.self, forCellWithReuseIdentifier: ExploreSpotCell.reuseID)
 
@@ -346,14 +344,6 @@ final class DashboardViewController: UIViewController {
                     for: indexPath
                 ) as! StatCell
                 cell.configure(with: stat)
-                return cell
-                
-            case .chart(let snapshots):
-                let cell = collectionView.dequeueReusableCell(
-                    withReuseIdentifier: ChartCell.reuseID,
-                    for: indexPath
-                ) as! ChartCell
-                cell.configure(with: snapshots)
                 return cell
                 
             case .insight(let insight):

@@ -1,17 +1,9 @@
 // ExploreSpotCell.swift
 // Signal
 //
-// A large card cell matching the Daily Adventure card style:
+//  Created by Vishal Bhogal on 27/04/26.
 //
-//   [icon]  Nearby [Category]           ← header row
 //
-//   Walk to [Place], about [dist] away. ← description
-//
-//   ⊕  [prompt text]                   ← mindful nudge (gray)
-//
-//   [Place Name]  [🚶 dist]  [⚡ 15 XP] ← info chips
-//
-//   [ Show on Map ]  [ Check In / Get Closer ]  ← action buttons
 
 import MapKit
 import UIKit
