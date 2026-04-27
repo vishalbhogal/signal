@@ -1,30 +1,28 @@
 //
-//  BadgeStoreTests 2.swift
+//  BadgeStoreTests.swift
 //  Signal
-//
-//  Created by Vishal Bhogal on 27/04/26.
 //
 
 import XCTest
 @testable import Signal
 
-// MARK: - Badge Store Tests
-
 final class BadgeStoreTests: XCTestCase {
 
-    // Each test needs an isolated store so visits don't bleed between tests.
-    // We use a dedicated UserDefaults suite so production defaults are untouched.
-    private var defaults: UserDefaults!
+    // Each test gets a unique namespace → isolated disk files + fresh memory cache.
+    // No test can accidentally read data written by a previous test.
+    private var namespace: String!
     private var store: BadgeStore!
 
     override func setUp() {
         super.setUp()
-        defaults = UserDefaults(suiteName: "SignalTests.\(UUID())")!
-        store = BadgeStore(defaults: defaults)
+        // UUID ensures each test run has its own clean namespace, like a fresh install.
+        namespace = "SignalTests.\(UUID().uuidString)"
+        store = BadgeStore(namespace: namespace)
     }
 
     override func tearDown() {
-        defaults.removePersistentDomain(forName: defaults.description)
+        // Clean up the disk cache files this test wrote, so they don't accumulate.
+        store.clearAll()
         super.tearDown()
     }
 
@@ -35,14 +33,14 @@ final class BadgeStoreTests: XCTestCase {
     }
 
     func test_sameThreshold_notAwardedTwice() {
-        store.recordParkVisit()  // unlocks explorer_1
+        store.recordParkVisit()          // unlocks explorer_1
         let second = store.recordParkVisit()
         XCTAssertFalse(second.contains { $0.id == "explorer_1" })
     }
 
     func test_reachingHigherThreshold_unlocksCorrectBadge() {
         for _ in 0..<4 { store.recordParkVisit() }
-        let fifth = store.recordParkVisit()  // visit #5
+        let fifth = store.recordParkVisit()   // visit #5
         XCTAssertTrue(fifth.contains { $0.id == "explorer_5" })
     }
 
@@ -54,10 +52,14 @@ final class BadgeStoreTests: XCTestCase {
         XCTAssertEqual(store.parkVisitCount, 2)
     }
 
-    func test_earnedBadgeIDs_persistAcrossStoreLookups() {
+    func test_earnedBadgeIDs_persistAcrossStoreInstances() {
+        // Write via store (writes L1 memory + L2 disk).
         store.recordParkVisit()
-        // Create a second store pointing at the same defaults.
-        let store2 = BadgeStore(defaults: defaults)
-        XCTAssertTrue(store2.earnedBadgeIDs.contains("explorer_1"))
+
+        // New instance with the SAME namespace → its L1 is cold (empty memory cache).
+        // It should get an L2 disk HIT and find the badge we just earned.
+        let store2 = BadgeStore(namespace: namespace)
+        XCTAssertTrue(store2.earnedBadgeIDs.contains("explorer_1"),
+                      "Badge earned in one store instance must persist to another via disk cache")
     }
 }

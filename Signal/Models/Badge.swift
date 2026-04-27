@@ -24,55 +24,115 @@ struct BadgeDefinition {
     ]
 }
 
-// MARK: - Badge Store
+// MARK: - Badge Cache Key
+//
+// A type-safe enum for the keys we store in TwoLevelCache.
+// Using an enum instead of raw strings prevents typos like
+// "badge.visitcount" vs "badge.visitCount" causing silent cache misses.
+//
+// CustomStringConvertible is required by DiskCache so it can turn the key
+// into a filename (e.g. "visitCount.json" on disk).
+enum BadgeCacheKey: String, CustomStringConvertible {
+    case visitCount = "visitCount"
+    case earnedIDs  = "earnedIDs"
 
-// We use it here to remember:
-//   1. How many parks the user has visited (an Int)
-//   2. Which badge IDs they've already earned (an array of Strings)
+    // `description` is what CustomStringConvertible requires.
+    // DiskCache calls "\(key)" which invokes this → becomes the JSON filename.
+    var description: String { rawValue }
+}
+
+// MARK: - Badge Store
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// CACHING STRATEGY
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// BadgeStore uses TWO separate TwoLevelCache instances because each piece of
+// data has a different type (Int vs [String]):
+//
+//   visitCache  — TwoLevelCache<BadgeCacheKey, Int>
+//                 Stores the park visit counter (e.g. 5).
+//
+//   badgeCache  — TwoLevelCache<BadgeCacheKey, [String]>
+//                 Stores earned badge IDs as an array (e.g. ["explorer_1","explorer_5"]).
+//                 Set<String> isn't storable directly; we convert to/from [String].
+//
+// Each cache is two-level (L1 memory → L2 disk).
+// On first launch both caches are empty → MISS → store returns a default.
+// After the first write, subsequent reads get a memory HIT (fast path).
+// After an app restart, memory is cold → MISS on L1 → HIT on L2 → L1 is warmed.
 // ─────────────────────────────────────────────────────────────────────────────
 
 final class BadgeStore {
-    // one source of truth
-    // for persistent state (like a visit counter).
+
+    // ── Singleton ─────────────────────────────────────────────────────────────
+    // Production code uses BadgeStore.shared so there is one counter for the app.
     static let shared = BadgeStore()
-    private let defaults: UserDefaults
-    private let earnedKey = "signal.earnedBadgeIDs"
-    private let visitKey  = "signal.parkVisitCount"
-    
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+
+    // ── Two caches, typed independently ──────────────────────────────────────
+    private let visitCache: TwoLevelCache<BadgeCacheKey, Int>
+    private let badgeCache: TwoLevelCache<BadgeCacheKey, [String]>
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    // `namespace` scopes the disk cache files to a subfolder.
+    // Tests pass a unique UUID namespace → isolated files, no cross-test pollution.
+    // Default value means production code just calls BadgeStore().
+    init(namespace: String = "signal.badges") {
+        visitCache = TwoLevelCache(namespace: "\(namespace).visits")
+        badgeCache = TwoLevelCache(namespace: "\(namespace).earned")
     }
 
+    // ── Visit counter ─────────────────────────────────────────────────────────
+    // Reading goes through TwoLevelCache.get() — L1 then L2.
+    // First read after install: MISS → returns 0 (default).
+    // Subsequent reads same session: L1 HIT (memory, instant).
+    // Read after app restart: L1 MISS → L2 HIT (disk) → warms L1.
     var parkVisitCount: Int {
-        get { defaults.integer(forKey: visitKey) }
-        set { defaults.set(newValue, forKey: visitKey) }
+        get { visitCache.get(forKey: .visitCount) ?? 0 }
+        set { visitCache.set(newValue, forKey: .visitCount) }
     }
 
+    // ── Earned badge IDs ──────────────────────────────────────────────────────
+    // Stored as [String] (Codable) and exposed as Set<String> (O(1) contains).
+    // First read: MISS → returns empty set (default).
     var earnedBadgeIDs: Set<String> {
-        Set(defaults.stringArray(forKey: earnedKey) ?? [])
+        // ?? [] handles the MISS case: no array on disk yet → empty set.
+        Set(badgeCache.get(forKey: .earnedIDs) ?? [])
     }
 
+    // ── Public API ────────────────────────────────────────────────────────────
+    // Called by ExploreManager when the user taps "Check In".
     @discardableResult
     func recordParkVisit() -> [BadgeDefinition] {
-        parkVisitCount += 1
+        parkVisitCount += 1      // write new count to both cache levels
         return checkAndAward()
     }
 
-    // This runs after every visit
+    // ── Private: badge unlock logic ───────────────────────────────────────────
     private func checkAndAward() -> [BadgeDefinition] {
+        // Read current state from the cache (will be an L1 HIT — we just wrote).
         let already = earnedBadgeIDs
-        let count = parkVisitCount
+        let count   = parkVisitCount
 
-        // Find badges that are BOTH:
-        //   a) not already earned
-        //   b) threshold is now met
-        let newly = BadgeDefinition.all.filter { !already.contains($0.id) && count >= $0.threshold }
-        if !newly.isEmpty {
-            let updated = already.union(newly.map { $0.id })
-            defaults.set(Array(updated), forKey: earnedKey)
+        // Filter the badge catalog: not yet earned AND threshold now met.
+        let newly = BadgeDefinition.all.filter {
+            !already.contains($0.id) && count >= $0.threshold
         }
 
-        // Return the newly earned badges so the ViewController can show an alert.
+        if !newly.isEmpty {
+            // Merge new badge IDs into the existing set and persist both levels.
+            let updated = already.union(newly.map { $0.id })
+            badgeCache.set(Array(updated), forKey: .earnedIDs)
+        }
+
         return newly
+    }
+
+    // ── Test / logout helper ──────────────────────────────────────────────────
+    // Wipes both cache levels for both keys.
+    // Called in tearDown() of unit tests to clean up disk files between runs.
+    func clearAll() {
+        visitCache.clear()
+        badgeCache.clear()
     }
 }
