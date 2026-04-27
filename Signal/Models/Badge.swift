@@ -1,10 +1,7 @@
 // Badge.swift
 // Signal
 //
-//  Created by Vishal Bhogal on 27/04/26.
-// Static badge catalog + UserDefaults-backed store.
-// Explorer badges are awarded when the clinician visits parks / landmarks
-// via the Explore Nearby section on the Dashboard.
+// Created by Vishal Bhogal on 27/04/26.
 
 import Foundation
 
@@ -29,49 +26,53 @@ struct BadgeDefinition {
 
 // MARK: - Badge Store
 
-/// Persists earned badge IDs and the cumulative park-visit count in UserDefaults.
-/// All access is synchronous and safe on the main thread.
+// We use it here to remember:
+//   1. How many parks the user has visited (an Int)
+//   2. Which badge IDs they've already earned (an array of Strings)
+// ─────────────────────────────────────────────────────────────────────────────
+
 final class BadgeStore {
-
-    /// Production singleton — uses the standard UserDefaults suite.
+    // one source of truth
+    // for persistent state (like a visit counter).
     static let shared = BadgeStore()
-
     private let defaults: UserDefaults
     private let earnedKey = "signal.earnedBadgeIDs"
     private let visitKey  = "signal.parkVisitCount"
-
-    /// Designated init — accepts any UserDefaults suite so tests can inject an
-    /// isolated suite and avoid polluting (or depending on) production storage.
+    
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
 
-    /// Total number of explore-spot check-ins recorded.
     var parkVisitCount: Int {
         get { defaults.integer(forKey: visitKey) }
         set { defaults.set(newValue, forKey: visitKey) }
     }
 
-    /// Set of badge IDs the user has already earned.
     var earnedBadgeIDs: Set<String> {
         Set(defaults.stringArray(forKey: earnedKey) ?? [])
     }
 
-    /// Increments the visit counter and returns any newly unlocked badges.
     @discardableResult
     func recordParkVisit() -> [BadgeDefinition] {
         parkVisitCount += 1
         return checkAndAward()
     }
 
+    // This runs after every visit
     private func checkAndAward() -> [BadgeDefinition] {
         let already = earnedBadgeIDs
-        let count   = parkVisitCount
-        let newly   = BadgeDefinition.all.filter { !already.contains($0.id) && count >= $0.threshold }
+        let count = parkVisitCount
+
+        // Find badges that are BOTH:
+        //   a) not already earned
+        //   b) threshold is now met
+        let newly = BadgeDefinition.all.filter { !already.contains($0.id) && count >= $0.threshold }
         if !newly.isEmpty {
             let updated = already.union(newly.map { $0.id })
             defaults.set(Array(updated), forKey: earnedKey)
         }
+
+        // Return the newly earned badges so the ViewController can show an alert.
         return newly
     }
 }

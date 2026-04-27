@@ -56,7 +56,6 @@ struct BurnoutRiskScore: Codable, Hashable {
 // MARK: - Daily Health Snapshot
 
 /// One day's worth of behavioral data that feeds the burnout model.
-/// All values are mocked — no HealthKit or CoreMotion involved.
 struct DailyHealthSnapshot: Codable, Identifiable, Hashable {
     let id: UUID
     let date: Date
@@ -118,8 +117,6 @@ nonisolated struct HealthInsight: Codable, Identifiable, Hashable, Sendable {
 }
 
 // MARK: - Clinician Profile
-
-/// Basic profile info shown on the Profile tab.
 struct ClinicianProfile: Codable {
     let id: UUID
     let name: String

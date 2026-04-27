@@ -1,6 +1,7 @@
 // ExploreManager.swift
 // Signal
 //
+// Created by Vishal Bhogal on 24/04/26.
 // ─────────────────────────────────────────────────────────────────────────────
 // EXPLORE NEARBY — SERVICE LAYER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -10,8 +11,6 @@
 //   2. Queries MapKit for nearby parks / green spaces / landmarks.
 //   3. Tracks which spots the user has already visited (UserDefaults).
 //
-// It is a @MainActor class so its @Published properties and all mutations
-// happen on the main thread — safe to subscribe from UIKit view controllers.
 //
 // PROXIMITY STATES
 //   .far    — user is > 375 m away   → "Visit" button is disabled (greyed out)
@@ -19,9 +18,7 @@
 //   .exact  — user is ≤  75 m away   → "Visit" button active (full XP)
 //
 // BADGE INTEGRATION
-//   markVisited(_:) delegates to BadgeStore.recordParkVisit(), which returns
-//   any newly unlocked BadgeDefinitions.  The caller (DashboardViewController)
-//   is responsible for presenting the badge alert.
+//   markVisited(_:) delegates to BadgeStore.recordParkVisit()
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Combine
@@ -30,19 +27,12 @@ import Foundation
 import MapKit
 
 // MARK: - ExploreSpot
-
-/// Lightweight, value-type representation of one nearby park / landmark.
-/// Stored as plain Doubles so no CoreLocation import is needed in the UI layer.
 struct ExploreSpot: Hashable, Sendable {
-
     enum ProximityState: Sendable {
-        case far        // > 375 m — too far to check in
-        case nearby     // ≤ 375 m — close enough for partial credit
-        case exact      // ≤  75 m — right at the spot, full credit
+        case far
+        case nearby
+        case exact     
     }
-
-    /// Stable key derived from rounded coordinates so the same physical place
-    /// always gets the same ID across refreshes.
     let id: String
     let name: String
     let categoryName: String
@@ -50,13 +40,9 @@ struct ExploreSpot: Hashable, Sendable {
     let latitude: Double
     let longitude: Double
     let distanceMeters: Double
-    let prompt: String          // Mindful nudge shown on the card
+    let prompt: String
     var isVisited: Bool
     var proximityState: ProximityState
-
-    // Hash keyed on `id` alone so the same physical place is stable across refreshes.
-    // Equality also checks mutable state fields so DiffableDataSource detects when
-    // isVisited or proximityState changes and reconfigures the cell automatically.
     static func == (lhs: ExploreSpot, rhs: ExploreSpot) -> Bool {
         lhs.id == rhs.id &&
         lhs.isVisited == rhs.isVisited &&
@@ -73,25 +59,11 @@ struct ExploreSpot: Hashable, Sendable {
 }
 
 // MARK: - ExploreManager
-
-nonisolated final class ExploreManager: NSObject {
-
-    // MARK: Published state
-
-    /// The current list of nearby explore spots (up to 3).
-    /// DashboardViewController subscribes to this with Combine.
+ final class ExploreManager: NSObject {
     @Published private(set) var spots: [ExploreSpot] = []
-
-    /// Mirrors CLLocationManager's authorization status so the UI can show
-    /// a prompt or disable the section gracefully.
     @Published private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
-
-    // MARK: Private
-
     private let locationManager = CLLocationManager()
     private let visitedKey = "signal.visitedExploreSpotIDs"
-
-    // MARK: Init
 
     override init() {
         super.init()
@@ -101,14 +73,11 @@ nonisolated final class ExploreManager: NSObject {
     }
 
     // MARK: - Public API
-
-    /// Call this in viewWillAppear. Requests authorization on first run;
-    /// on subsequent calls with an authorized status it triggers a location fix
-    /// which eventually fires `didUpdateLocations` → `refresh(around:)`.
     func requestLocationIfNeeded() {
         switch locationManager.authorizationStatus {
         case .notDetermined:
             locationManager.requestWhenInUseAuthorization()
+            
         case .authorizedWhenInUse, .authorizedAlways:
             locationManager.startUpdatingLocation()
             // In the Simulator the location delegate often never fires unless
@@ -132,7 +101,6 @@ nonisolated final class ExploreManager: NSObject {
     }
 
     /// Fetch nearby spots around a given location and update `spots`.
-    /// Call this directly in tests or when you already have a CLLocation.
     func refresh(around userLocation: CLLocation) async {
         var fetched = await fetchSpots(around: userLocation)
         let visited = visitedIDs()
@@ -140,9 +108,6 @@ nonisolated final class ExploreManager: NSObject {
             fetched[i].isVisited = visited.contains(fetched[i].id)
             fetched[i].proximityState = computeProximity(for: fetched[i], userLocation: userLocation)
         }
-        // MapKit can return the same physical place from multiple category queries.
-        // Deduplicate by id before publishing so DiffableDataSource never receives
-        // two items with the same identifier.
         var seen = Set<String>()
         fetched = fetched.filter { seen.insert($0.id).inserted }
         spots = fetched
@@ -268,10 +233,8 @@ nonisolated final class ExploreManager: NSObject {
 // MARK: - CLLocationManagerDelegate
 
 extension ExploreManager: CLLocationManagerDelegate {
-
     // Called when the user grants or denies location permission.
-    // `nonisolated` because CLLocationManagerDelegate doesn't run on MainActor.
-    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         Task { @MainActor in
             self.authorizationStatus = status
@@ -283,7 +246,7 @@ extension ExploreManager: CLLocationManagerDelegate {
 
     // Fired when a location fix arrives.  We stop updating immediately so the
     // manager doesn't burn battery on continuous tracking.
-    nonisolated func locationManager(_ manager: CLLocationManager,
+    func locationManager(_ manager: CLLocationManager,
                                      didUpdateLocations locations: [CLLocation]) {
         guard let loc = locations.last else { return }
         manager.stopUpdatingLocation()

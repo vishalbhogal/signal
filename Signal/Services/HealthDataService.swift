@@ -1,39 +1,29 @@
 // HealthDataService.swift
 // Signal
 //
-// Protocol-driven service layer for health data.
-// The protocol is the contract — ViewModels talk to the protocol, not the concrete type.
-// This means we can swap MockHealthDataService for a LiveHealthDataService
-// without touching any ViewModel code. (Dependency Inversion Principle — the D in SOLID)
+// Created by Vishal Bhogal on 27/04/26.
+
 
 import Foundation
 
 // MARK: - Protocol
+// Protocol-driven service layer for health data.
+// later - a LiveHealthDataService
+// (Dependency Inversion Principle)
 
-/// Any health data provider (mock or live) must implement these methods.
 protocol HealthDataServiceProtocol {
-    /// Returns the last 7 days of snapshots, newest first.
     func fetchWeeklySnapshots() async throws -> [DailyHealthSnapshot]
-
-    /// Returns the clinician's profile.
     func fetchProfile() async throws -> ClinicianProfile
 }
 
 // MARK: - Mock Implementation
-
-/// Returns deterministic fake data — no network, no sensors.
-/// Useful for development, SwiftUI previews, and unit tests.
 final class MockHealthDataService: HealthDataServiceProtocol {
-
+    /// Returns the last 7 days of snapshots, newest first.
     func fetchWeeklySnapshots() async throws -> [DailyHealthSnapshot] {
-        // Simulate a short async delay so the UI can show a loading state.
         try await Task.sleep(nanoseconds: 400_000_000) // 0.4 seconds
-
         let calendar = Calendar.current
         let today = Date()
-
-        // Generate one snapshot per day for the last 7 days.
-        // `enumerated()` gives us the index (0–6) alongside the value.
+        
         return (0..<7).map { offset in
             let date = calendar.date(byAdding: .day, value: -offset, to: today)!
             return DailyHealthSnapshot(
@@ -51,7 +41,7 @@ final class MockHealthDataService: HealthDataServiceProtocol {
     func fetchProfile() async throws -> ClinicianProfile {
         return ClinicianProfile(
             id: UUID(),
-            name: "John Doe",
+            name: "Vishal Bhogal",
             role: "Teacher",
             interests: "F1, Manchester united, Hiking",
             avatarInitials: "VB"

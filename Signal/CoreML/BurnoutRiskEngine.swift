@@ -14,7 +14,6 @@
 //   2. The trained weights (numbers learned from training data)
 //   3. The input/output schema (what types go in, what types come out)
 //
-// When you add a .mlmodel to Xcode, it auto-generates a Swift wrapper class.
 // For a model named "BurnoutRiskModel.mlmodel" Xcode generates:
 //   - BurnoutRiskModel          (the model class)
 //   - BurnoutRiskModelInput     (struct with your feature properties)
@@ -29,22 +28,15 @@
 // WHY WE'RE MOCKING IT HERE
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// Training a real model requires labeled historical data from clinicians —
+// Training a real model requires labeled historical data
 // which we don't have yet. So BurnoutRiskEngine uses a hand-tuned scoring
 // formula that mimics what a trained model would output.
-//
-// The protocol below means: when we do have a real .mlmodel, we just swap
-// the concrete implementation without touching any ViewModel or UI code.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Foundation
-// When integrating a real Core ML model, you'd also import:
-// import CoreML
-
 // MARK: - Protocol
 
-/// Any burnout inference engine (mock or real Core ML) must implement this.
-/// `async throws` because a real model load from disk could fail or take time.
+/// `async throws` real model load from disk could fail or take time with CoreML.
 protocol BurnoutRiskEngineProtocol {
     func predict(features: WeeklyBehavioralFeatures) async throws -> BurnoutRiskScore
 }
@@ -52,29 +44,42 @@ protocol BurnoutRiskEngineProtocol {
 // MARK: - Mock Engine (Formula-Based)
 
 /// Scores burnout risk using a weighted formula across 5 behavioral signals.
-/// This is deterministic — same features always produce the same score.
 final class MockBurnoutRiskEngine: BurnoutRiskEngineProtocol {
 
     func predict(features: WeeklyBehavioralFeatures) async throws -> BurnoutRiskScore {
 
         // ─── SCORING LOGIC ───────────────────────────────────────────────────
-        //
-        // Each signal contributes a sub-score in the 0.0–1.0 range.
-        // The final score is a weighted average — weights sum to 1.0.
-        // Higher weight = that signal has more influence on the final score.
-        //
         // Weights are chosen based on published burnout research:
-        //   Sleep and HRV are the strongest physiological predictors.
-        //   Work hours captures the environmental load.
-        //   Steps and active minutes reflect recovery behavior.
+        //   Sleep and HRV -> strongest physiological predictors.
+        //   Work hours -> captures the environmental load.
+        //   Steps and active minutes -> reflect recovery behavior.
+        
+//        The formula, broken down:
+//
+//        ┌────────┬────────────────────┬────────┬────────────────────────────┐
+//        │ Signal │      Formula       │ Weight │ Example (avg values above) │
+//        ├────────┼────────────────────┼────────┼────────────────────────────┤
+//        │ Sleep  │ (8 - avgSleep) / 8 │ 30%    │ (8 - 6.8) / 8 = 0.15       │
+//        ├────────┼────────────────────┼────────┼────────────────────────────┤
+//        │ HRV    │ (70 - avgHRV) / 70 │ 30%    │ (70 - 41) / 70 = 0.41      │
+//        ├────────┼────────────────────┼────────┼────────────────────────────┤
+//        │ Work   │ (avgWork - 8) / 6  │ 20%    │ (10.2 - 8) / 6 = 0.37      │
+//        ├────────┼────────────────────┼────────┼────────────────────────────┤
+//        │ Steps  │ 1 - steps / 10000  │ 10%    │ 1 - 5200/10000 = 0.48      │
+//        ├────────┼────────────────────┼────────┼────────────────────────────┤
+//        │ Active │ 1 - active / 30    │ 10%    │ 1 - 28/30 = 0.07           │
+//        └────────┴────────────────────┴────────┴────────────────────────────┘
+//
+//        Raw score = (0.15 × 0.30) + (0.41 × 0.30) + (0.37 × 0.20) + (0.48 × 0.10) + (0.07 × 0.10)
+//        = 0.045 + 0.123 + 0.074 + 0.048 + 0.007 = 0.297
+//
+//        Bucketing: < 0.35 → .low, 0.35–0.65 → .moderate, > 0.65 → .high
 
         // Sleep score: fewer hours → higher risk.
-        // Normalizes the deficit below 8 hours into 0–1 range.
         let sleepScore = max(0, (8.0 - features.avgSleepHours) / 8.0)
         // e.g. 6 hrs sleep → (8-6)/8 = 0.25 risk contribution
 
         // HRV score: lower HRV → higher stress → higher risk.
-        // We cap at 70ms as the "healthy" ceiling.
         let hrvScore = max(0, (70.0 - features.avgHRV) / 70.0)
         // e.g. 35ms HRV → (70-35)/70 = 0.50 risk contribution
 
@@ -92,7 +97,6 @@ final class MockBurnoutRiskEngine: BurnoutRiskEngineProtocol {
         let activeScore = max(0, 1.0 - (features.avgActiveMinutes / 30.0))
 
         // ─── WEIGHTED SUM ────────────────────────────────────────────────────
-        // Multiply each sub-score by its weight, then sum.
         // Weights: sleep 30%, hrv 30%, work 20%, steps 10%, active 10%
         let rawScore = (sleepScore  * 0.30)
                      + (hrvScore    * 0.30)
@@ -100,7 +104,6 @@ final class MockBurnoutRiskEngine: BurnoutRiskEngineProtocol {
                      + (stepScore   * 0.10)
                      + (activeScore * 0.10)
 
-        // Clamp to [0, 1] — floating point arithmetic can occasionally drift slightly.
         let finalScore = min(1.0, max(0.0, rawScore))
 
         // ─── BUCKET INTO RISK LEVEL ──────────────────────────────────────────
@@ -121,12 +124,9 @@ final class MockBurnoutRiskEngine: BurnoutRiskEngineProtocol {
 
 // MARK: - Real Core ML Engine (Reference — not yet active)
 
-// Uncomment this class when you have a trained BurnoutRiskModel.mlmodel
-// added to the Xcode project target.
 //
 // final class CoreMLBurnoutRiskEngine: BurnoutRiskEngineProtocol {
-//
-//     // The auto-generated model wrapper from Xcode's .mlmodel compilation.
+
 //     private let model: BurnoutRiskModel
 //
 //     init() throws {
@@ -138,7 +138,6 @@ final class MockBurnoutRiskEngine: BurnoutRiskEngineProtocol {
 //     func predict(features: WeeklyBehavioralFeatures) async throws -> BurnoutRiskScore {
 //
 //         // Build the auto-generated input struct with your feature values.
-//         // Property names here must exactly match the model's input feature names.
 //         let input = BurnoutRiskModelInput(
 //             avgSleepHours: features.avgSleepHours,
 //             avgStepCount: features.avgStepCount,
@@ -150,7 +149,6 @@ final class MockBurnoutRiskEngine: BurnoutRiskEngineProtocol {
 //         )
 //
 //         // model.prediction(input:) runs the neural network / decision tree on-device.
-//         // All computation is local — no data leaves the device.
 //         let output = try model.prediction(input: input)
 //
 //         // `burnoutRiskProbability` is the output feature defined in the .mlmodel.
