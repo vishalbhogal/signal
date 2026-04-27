@@ -129,21 +129,13 @@ final class StatCell: UICollectionViewCell {
         updateSparklineBg()
     }
 
-    /// Full-card diagonal gradient: accent color (light) → white.
-    /// Each metric chip gets its own tint so the row reads as a colour-coded set.
     private func updateCardGradient() {
-        cardGradientLayer?.removeFromSuperlayer()
-        let gl = CAGradientLayer()
-        gl.frame        = contentView.bounds
-        gl.cornerRadius = 16
-        gl.colors = [
-            accentColor.withAlphaComponent(0.18).cgColor,   // top-left: metric tint
-            UIColor.white.withAlphaComponent(0.95).cgColor, // bottom-right: clean white
-        ]
-        gl.startPoint = CGPoint(x: 0.0, y: 0.0)
-        gl.endPoint   = CGPoint(x: 1.0, y: 1.0)   // diagonal for a bit of depth
-        contentView.layer.insertSublayer(gl, at: 0)
-        cardGradientLayer = gl
+        cardGradientLayer = contentView.applyDiagonalGradient(
+            replacing: cardGradientLayer,
+            from: accentColor.withAlphaComponent(0.18),
+            to: UIColor.white.withAlphaComponent(0.95),
+            cornerRadius: 16
+        )
     }
 
     private func updateSparklineBg() {

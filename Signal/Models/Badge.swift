@@ -1,6 +1,7 @@
 // Badge.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // Static badge catalog + UserDefaults-backed store.
 // Explorer badges are awarded when the clinician visits parks / landmarks
 // via the Explore Nearby section on the Dashboard.
@@ -31,22 +32,29 @@ struct BadgeDefinition {
 /// Persists earned badge IDs and the cumulative park-visit count in UserDefaults.
 /// All access is synchronous and safe on the main thread.
 final class BadgeStore {
-    static let shared = BadgeStore()
-    private init() {}
 
+    /// Production singleton — uses the standard UserDefaults suite.
+    static let shared = BadgeStore()
+
+    private let defaults: UserDefaults
     private let earnedKey = "signal.earnedBadgeIDs"
     private let visitKey  = "signal.parkVisitCount"
 
+    /// Designated init — accepts any UserDefaults suite so tests can inject an
+    /// isolated suite and avoid polluting (or depending on) production storage.
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
     /// Total number of explore-spot check-ins recorded.
     var parkVisitCount: Int {
-        get { UserDefaults.standard.integer(forKey: visitKey) }
-        set { UserDefaults.standard.set(newValue, forKey: visitKey) }
+        get { defaults.integer(forKey: visitKey) }
+        set { defaults.set(newValue, forKey: visitKey) }
     }
 
     /// Set of badge IDs the user has already earned.
     var earnedBadgeIDs: Set<String> {
-        let arr = UserDefaults.standard.stringArray(forKey: earnedKey) ?? []
-        return Set(arr)
+        Set(defaults.stringArray(forKey: earnedKey) ?? [])
     }
 
     /// Increments the visit counter and returns any newly unlocked badges.
@@ -62,7 +70,7 @@ final class BadgeStore {
         let newly   = BadgeDefinition.all.filter { !already.contains($0.id) && count >= $0.threshold }
         if !newly.isEmpty {
             let updated = already.union(newly.map { $0.id })
-            UserDefaults.standard.set(Array(updated), forKey: earnedKey)
+            defaults.set(Array(updated), forKey: earnedKey)
         }
         return newly
     }

@@ -1,6 +1,7 @@
 // DashboardViewModel.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // ─────────────────────────────────────────────────────────────────────────────
 // COMBINE — WHY IT'S USED HERE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,7 +28,38 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Foundation
-import Combine  // Apple's reactive framework (no package needed — built into iOS 13+)
+import Combine
+import UIKit   // StatItem carries UIColor — acceptable for UIKit-backed ViewModels
+
+// MARK: - Stat Item
+//
+// Represents one "This Week" metric chip on the dashboard.
+// Lives here (not in the ViewController) because `buildStatItems(from:)` is
+// a data-transformation step that should be unit-testable without a live VC.
+//
+// Note: UIColor in a ViewModel is a pragmatic trade-off in UIKit apps.
+// In a cross-platform / SwiftUI architecture you'd use a semantic color key
+// and resolve it to UIColor in the cell.
+struct StatItem: Sendable {
+    let title: String
+    let value: String
+    let unit: String
+    let iconName: String
+    let bubbleColor: UIColor        // Pastel bubble behind the icon
+    let iconColor: UIColor          // Darker tint for the icon itself
+    let sparklineValues: [Double]   // 7 daily values for the mini sparkline
+}
+
+extension StatItem: Hashable {
+    static func == (lhs: StatItem, rhs: StatItem) -> Bool {
+        lhs.title == rhs.title && lhs.value == rhs.value && lhs.unit == rhs.unit
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(title)
+        hasher.combine(value)
+        hasher.combine(unit)
+    }
+}
 
 // MARK: - Dashboard State
 
@@ -47,6 +79,8 @@ struct DashboardData {
     let snapshots: [DailyHealthSnapshot]
     let insights: [HealthInsight]
     let features: WeeklyBehavioralFeatures
+    // Pre-built by the ViewModel so the VC only needs to hand them to the data source.
+    let statItems: [StatItem]
 }
 
 // MARK: - ViewModel
@@ -85,28 +119,32 @@ final class DashboardViewModel: ObservableObject {
         // Without Task, you can't call `await` inside a regular function.
         Task {
             do {
-                // Run both fetches concurrently using async let.
-                // Without `async let`, they'd run sequentially (slower).
-                // With `async let`, both start immediately and we wait for both.
-                async let snapshots = healthService.fetchWeeklySnapshots()
-                async let features  = healthService.fetchWeeklyFeatures()
-
-                // `await` here waits for BOTH to finish before continuing.
-                let (resolvedSnapshots, resolvedFeatures) = try await (snapshots, features)
+                // Fetch the raw daily snapshots — single source of truth.
+                // Features are then *derived* from this same array so sparklines
+                // and weekly averages are guaranteed to reflect identical data.
+                // (Previously fetchWeeklyFeatures() was called concurrently and
+                //  generated its own independent random dataset — a subtle bug.)
+                let snapshots = try await healthService.fetchWeeklySnapshots()
+                let features  = WeeklyBehavioralFeatures.compute(from: snapshots)
 
                 // Run Core ML inference with the aggregated weekly features.
-                let riskScore = try await riskEngine.predict(features: resolvedFeatures)
+                let riskScore = try await riskEngine.predict(features: features)
 
                 // Generate text insight cards from the same features.
-                let insights = InsightGenerator.generateInsights(from: resolvedFeatures)
+                let insights = InsightGenerator.generateInsights(from: features)
+
+                // Build stat chip view-models here, not in the ViewController,
+                // so this transformation is covered by unit tests.
+                let statItems = Self.buildStatItems(from: features, snapshots: snapshots)
 
                 // Bundle everything and publish the loaded state.
                 // Because we're @MainActor, this is safe to do directly.
                 state = .loaded(DashboardData(
                     riskScore: riskScore,
-                    snapshots: resolvedSnapshots,
+                    snapshots: snapshots,
                     insights: insights,
-                    features: resolvedFeatures
+                    features: features,
+                    statItems: statItems
                 ))
 
             } catch {
@@ -114,5 +152,53 @@ final class DashboardViewModel: ObservableObject {
                 state = .error(error.localizedDescription)
             }
         }
+    }
+
+    // MARK: - Stat Item Builder
+
+    /// Transforms raw health data into the view-model structs consumed by StatCell.
+    /// `static` so it can be called directly in unit tests without a ViewModel instance.
+    static func buildStatItems(from features: WeeklyBehavioralFeatures,
+                               snapshots: [DailyHealthSnapshot]) -> [StatItem] {
+        // Sort oldest → newest so the sparkline reads left-to-right in time.
+        let sorted = snapshots.sorted { $0.date < $1.date }
+        return [
+            StatItem(
+                title: "Sleep",
+                value: String(format: "%.1f", features.avgSleepHours),
+                unit: "hrs",
+                iconName: "moon.fill",
+                bubbleColor: Signal.Colors.sleepBubble,
+                iconColor:   Signal.Colors.sleepIcon,
+                sparklineValues: sorted.map { $0.sleepHours }
+            ),
+            StatItem(
+                title: "Steps",
+                value: "\(Int(features.avgStepCount))",
+                unit: "avg",
+                iconName: "figure.walk",
+                bubbleColor: Signal.Colors.stepsBubble,
+                iconColor:   Signal.Colors.stepsIcon,
+                sparklineValues: sorted.map { Double($0.stepCount) / 1000 }
+            ),
+            StatItem(
+                title: "HRV",
+                value: "\(Int(features.avgHRV))",
+                unit: "ms",
+                iconName: "waveform.path.ecg",
+                bubbleColor: Signal.Colors.hrvBubble,
+                iconColor:   Signal.Colors.hrvIcon,
+                sparklineValues: sorted.map { $0.heartRateVariability }
+            ),
+            StatItem(
+                title: "Shift",
+                value: String(format: "%.1f", features.avgWorkHours),
+                unit: "hrs",
+                iconName: "briefcase.fill",
+                bubbleColor: Signal.Colors.workBubble,
+                iconColor:   Signal.Colors.workIcon,
+                sparklineValues: sorted.map { $0.workHours }
+            )
+        ]
     }
 }

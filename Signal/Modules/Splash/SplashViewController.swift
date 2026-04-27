@@ -1,6 +1,8 @@
 // SplashViewController.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
+//
 // Displays a Lottie animation on launch, then fires a callback
 // so the AppCoordinator can transition to the main tab bar.
 

@@ -1,6 +1,7 @@
 // InsightsViewController.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // Full-screen insights list using UICollectionView with a simple vertical layout.
 
 import UIKit

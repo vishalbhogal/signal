@@ -1,6 +1,7 @@
 // DashboardViewController.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // ─────────────────────────────────────────────────────────────────────────────
 // UICOLLECTIONVIEW + COMPOSITIONAL LAYOUT — HOW IT ALL WORKS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,30 +55,6 @@ nonisolated enum DashboardItem: Hashable, Sendable {
     case stat(StatItem)
     case insight(HealthInsight)
     case exploreSpot(ExploreSpot)
-}
-
-/// A single stat chip displayed in the horizontal stats section.
-/// UIColor isn't Hashable natively — we hash on title+value+unit instead,
-/// which uniquely identifies each stat within a snapshot anyway.
-struct StatItem: Sendable {
-    let title: String
-    let value: String
-    let unit: String
-    let iconName: String
-    let bubbleColor: UIColor        // Pastel bubble behind the icon
-    let iconColor: UIColor          // Darker tint for the icon itself
-    let sparklineValues: [Double]   // 7 daily values for the mini sparkline
-}
-
-extension StatItem: Hashable {
-    static func == (lhs: StatItem, rhs: StatItem) -> Bool {
-        lhs.title == rhs.title && lhs.value == rhs.value && lhs.unit == rhs.unit
-    }
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(title)
-        hasher.combine(value)
-        hasher.combine(unit)
-    }
 }
 
 // MARK: - View Controller
@@ -446,9 +423,8 @@ final class DashboardViewController: UIViewController {
         // 2. Section: Risk Card
         snapshot.appendItems([DashboardItem.riskScore(data.riskScore)], toSection: .riskCard)
         
-        // 3. Section: Stats
-        let stats = buildStatItems(from: data.features, snapshots: data.snapshots)
-        snapshot.appendItems(stats.map { DashboardItem.stat($0) }, toSection: .stats)
+        // 3. Section: Stats — pre-built by the ViewModel, VC just hands them to the data source.
+        snapshot.appendItems(data.statItems.map { DashboardItem.stat($0) }, toSection: .stats)
         
         // 4. Section: Insights (Conditional)
         if !data.insights.isEmpty {
@@ -476,50 +452,6 @@ final class DashboardViewController: UIViewController {
         snapshot.deleteItems(current)
         snapshot.appendItems(unique.map { .exploreSpot($0) }, toSection: .explore)
         dataSource.apply(snapshot, animatingDifferences: true)
-    }
-
-    private func buildStatItems(from features: WeeklyBehavioralFeatures,
-                                snapshots: [DailyHealthSnapshot]) -> [StatItem] {
-        // Sort oldest → newest so the sparkline reads left-to-right in time.
-        let sorted = snapshots.sorted { $0.date < $1.date }
-        return [
-            StatItem(
-                title: "Sleep",
-                value: String(format: "%.1f", features.avgSleepHours),
-                unit: "hrs",
-                iconName: "moon.fill",
-                bubbleColor: Signal.Colors.sleepBubble,
-                iconColor:   Signal.Colors.sleepIcon,
-                sparklineValues: sorted.map { $0.sleepHours }
-            ),
-            StatItem(
-                title: "Steps",
-                value: "\(Int(features.avgStepCount))",
-                unit: "avg",
-                iconName: "figure.walk",
-                bubbleColor: Signal.Colors.stepsBubble,
-                iconColor:   Signal.Colors.stepsIcon,
-                sparklineValues: sorted.map { Double($0.stepCount) / 1000 }
-            ),
-            StatItem(
-                title: "HRV",
-                value: "\(Int(features.avgHRV))",
-                unit: "ms",
-                iconName: "waveform.path.ecg",
-                bubbleColor: Signal.Colors.hrvBubble,
-                iconColor:   Signal.Colors.hrvIcon,
-                sparklineValues: sorted.map { $0.heartRateVariability }
-            ),
-            StatItem(
-                title: "Shift",
-                value: String(format: "%.1f", features.avgWorkHours),
-                unit: "hrs",
-                iconName: "briefcase.fill",
-                bubbleColor: Signal.Colors.workBubble,
-                iconColor:   Signal.Colors.workIcon,
-                sparklineValues: sorted.map { $0.workHours }
-            )
-        ]
     }
 
     // MARK: - Compositional Layout

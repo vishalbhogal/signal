@@ -1,6 +1,8 @@
 // TrendsViewController.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
+//
 // Shows full-screen trend charts for each behavioral metric.
 // Uses the same UIHostingController + Apple Charts approach as ChartCell,
 // but with dedicated charts per metric on a scrollable page.

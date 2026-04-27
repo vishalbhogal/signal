@@ -1,6 +1,7 @@
 // MetricDetailSheetViewController.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // Modal sheet that slides up when the user taps a stat chip.
 // Shows the full 7-day sparkline at a readable size, a per-day breakdown
 // table, and a one-line interpretation comparing the week's average to

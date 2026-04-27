@@ -1,6 +1,7 @@
 // CacheStore.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // Generic caching protocol. Any concrete cache (memory or disk)
 // must conform to this. The `Key` and `Value` generics mean one
 // protocol definition works for any data type — no copy-paste.

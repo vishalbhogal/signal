@@ -1,6 +1,7 @@
 // Models.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // All core data models for the app.
 // These are plain Swift structs — no CoreData, no Realm.
 // Codable lets us encode/decode to JSON (useful for disk caching).
@@ -78,6 +79,30 @@ struct WeeklyBehavioralFeatures: Codable {
     let avgWorkHours: Double
     let sleepDeficitDays: Int   // Days where sleep < 6 hrs — a key burnout predictor
     let highWorkloadDays: Int   // Days where work > 10 hrs
+
+    /// Derives the feature vector directly from a snapshot array.
+    ///
+    /// Centralising this here means the Dashboard and Insights ViewModels both
+    /// operate on the *same* fetch result, so sparklines and weekly averages are
+    /// guaranteed to reflect identical underlying data.
+    static func compute(from snapshots: [DailyHealthSnapshot]) -> WeeklyBehavioralFeatures {
+        guard !snapshots.isEmpty else {
+            return WeeklyBehavioralFeatures(
+                avgSleepHours: 0, avgStepCount: 0, avgActiveMinutes: 0,
+                avgHRV: 0, avgWorkHours: 0, sleepDeficitDays: 0, highWorkloadDays: 0
+            )
+        }
+        let n = Double(snapshots.count)
+        return WeeklyBehavioralFeatures(
+            avgSleepHours:    snapshots.map(\.sleepHours).reduce(0, +) / n,
+            avgStepCount:     snapshots.map { Double($0.stepCount) }.reduce(0, +) / n,
+            avgActiveMinutes: snapshots.map { Double($0.activeMinutes) }.reduce(0, +) / n,
+            avgHRV:           snapshots.map(\.heartRateVariability).reduce(0, +) / n,
+            avgWorkHours:     snapshots.map(\.workHours).reduce(0, +) / n,
+            sleepDeficitDays: snapshots.filter { $0.sleepHours < 6.0 }.count,
+            highWorkloadDays: snapshots.filter { $0.workHours > 10.0 }.count
+        )
+    }
 }
 
 // MARK: - Health Insight

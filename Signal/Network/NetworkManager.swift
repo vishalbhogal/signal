@@ -1,6 +1,7 @@
 // NetworkManager.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // Generic async/await networking layer.
 // Even though Signal uses mocked data today, this provides the real
 // network plumbing so switching to a live API is a one-line change in Services.

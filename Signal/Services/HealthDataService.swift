@@ -15,9 +15,6 @@ protocol HealthDataServiceProtocol {
     /// Returns the last 7 days of snapshots, newest first.
     func fetchWeeklySnapshots() async throws -> [DailyHealthSnapshot]
 
-    /// Returns the computed weekly feature vector used as Core ML model input.
-    func fetchWeeklyFeatures() async throws -> WeeklyBehavioralFeatures
-
     /// Returns the clinician's profile.
     func fetchProfile() async throws -> ClinicianProfile
 }
@@ -49,22 +46,6 @@ final class MockHealthDataService: HealthDataServiceProtocol {
                 workHours: Double.random(in: 8.0...13.0)
             )
         }
-    }
-
-    func fetchWeeklyFeatures() async throws -> WeeklyBehavioralFeatures {
-        let snapshots = try await fetchWeeklySnapshots()
-
-        // Average each metric across the week.
-        let count = Double(snapshots.count)
-        return WeeklyBehavioralFeatures(
-            avgSleepHours: snapshots.map(\.sleepHours).reduce(0, +) / count,
-            avgStepCount: snapshots.map { Double($0.stepCount) }.reduce(0, +) / count,
-            avgActiveMinutes: snapshots.map { Double($0.activeMinutes) }.reduce(0, +) / count,
-            avgHRV: snapshots.map(\.heartRateVariability).reduce(0, +) / count,
-            avgWorkHours: snapshots.map(\.workHours).reduce(0, +) / count,
-            sleepDeficitDays: snapshots.filter { $0.sleepHours < 6.0 }.count,
-            highWorkloadDays: snapshots.filter { $0.workHours > 10.0 }.count
-        )
     }
 
     func fetchProfile() async throws -> ClinicianProfile {

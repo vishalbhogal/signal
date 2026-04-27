@@ -1,6 +1,8 @@
 // MetricChartView.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
+//
 // Smooth area + line chart for each behavioral metric.
 // Each metric gets its own accent color from the Signal design system.
 // No bar charts — smooth catmullRom curves with gradient fills.

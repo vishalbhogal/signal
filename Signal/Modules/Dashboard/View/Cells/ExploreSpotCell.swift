@@ -173,21 +173,15 @@ final class ExploreSpotCell: UICollectionViewCell {
         ).cgPath
     }
 
-    /// Nature-inspired gradient: very light sage-green at the top fading to
-    /// pure white — echoes the green wellness brand without shouting.
     private func updateCardGradient() {
-        cardGradientLayer?.removeFromSuperlayer()
-        let gl = CAGradientLayer()
-        gl.frame        = contentView.bounds
-        gl.cornerRadius = Signal.Card.radius
-        gl.colors = [
-            UIColor(red: 0.86, green: 0.96, blue: 0.90, alpha: 1.0).cgColor, // light sage
-            UIColor.white.cgColor,
-        ]
-        gl.startPoint = CGPoint(x: 0.0, y: 0.0)
-        gl.endPoint   = CGPoint(x: 1.0, y: 1.0)
-        contentView.layer.insertSublayer(gl, at: 0)
-        cardGradientLayer = gl
+        // Light sage → white: nature-inspired, echoes brand without shouting.
+        let sage = UIColor(red: 0.86, green: 0.96, blue: 0.90, alpha: 1.0)
+        cardGradientLayer = contentView.applyDiagonalGradient(
+            replacing: cardGradientLayer,
+            from: sage,
+            to: .white,
+            cornerRadius: Signal.Card.radius
+        )
     }
 
     // MARK: - Layout

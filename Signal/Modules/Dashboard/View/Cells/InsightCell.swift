@@ -179,22 +179,13 @@ final class InsightCell: UICollectionViewCell {
         updateCardGradient()
     }
 
-    /// Gentle diagonal gradient from the priority accent (very low opacity)
-    /// across to clean white — gives each card a warm, distinct feel without
-    /// competing with the accent bar on the left edge.
     private func updateCardGradient() {
-        cardGradientLayer?.removeFromSuperlayer()
-        let gl = CAGradientLayer()
-        gl.frame        = contentView.bounds
-        gl.cornerRadius = 16
-        gl.colors = [
-            currentAccent.withAlphaComponent(0.10).cgColor,
-            UIColor.white.cgColor,
-        ]
-        gl.startPoint = CGPoint(x: 0.0, y: 0.0)
-        gl.endPoint   = CGPoint(x: 1.0, y: 1.0)
-        contentView.layer.insertSublayer(gl, at: 0)
-        cardGradientLayer = gl
+        cardGradientLayer = contentView.applyDiagonalGradient(
+            replacing: cardGradientLayer,
+            from: currentAccent.withAlphaComponent(0.10),
+            to: .white,
+            cornerRadius: 16
+        )
     }
 
     // MARK: Configure

@@ -1,6 +1,7 @@
 // RiskBreakdownSheetViewController.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // Sheet that appears when the user taps the burnout risk card.
 // Shows the four weighted signals (Sleep 30%, HRV 30%, Work 20%, Activity 10%)
 // as colour-coded progress bars so the clinician can see exactly *why*

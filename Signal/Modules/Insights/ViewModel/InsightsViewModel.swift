@@ -1,5 +1,7 @@
 // InsightsViewModel.swift
 // Signal
+//
+//  Created by Vishal Bhogal on 27/04/26.
 
 import Foundation
 import Combine
@@ -25,8 +27,9 @@ final class InsightsViewModel: ObservableObject {
         state = .loading
         Task {
             do {
-                let features = try await healthService.fetchWeeklyFeatures()
-                let insights = InsightGenerator.generateInsights(from: features)
+                let snapshots = try await healthService.fetchWeeklySnapshots()
+                let features  = WeeklyBehavioralFeatures.compute(from: snapshots)
+                let insights  = InsightGenerator.generateInsights(from: features)
                 state = .loaded(insights)
             } catch {
                 state = .error(error.localizedDescription)

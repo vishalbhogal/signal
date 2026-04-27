@@ -1,6 +1,7 @@
 // DesignSystem.swift
 // Signal
 //
+//  Created by Vishal Bhogal on 27/04/26.
 // Central design token file. All colors, typography, and spacing constants live here.
 // Every UI file imports from this — no magic numbers or hex strings scattered in cells.
 //
@@ -179,5 +180,42 @@ extension CAGradientLayer {
         layer.endPoint   = CGPoint(x: 0.5, y: 1)
         layer.frame      = frame
         return layer
+    }
+}
+
+// MARK: - Reusable diagonal card gradient
+
+extension UIView {
+    /// Replaces `existing` with a fresh diagonal gradient layer inserted at index 0
+    /// of this view's layer, then returns it so the caller can store and reuse it.
+    ///
+    /// Call this inside `layoutSubviews` so the frame is already correct:
+    ///
+    ///     private var cardGradient: CAGradientLayer?
+    ///     override func layoutSubviews() {
+    ///         super.layoutSubviews()
+    ///         cardGradient = contentView.applyDiagonalGradient(
+    ///             replacing: cardGradient,
+    ///             from: accentColor.withAlphaComponent(0.15),
+    ///             to: .white,
+    ///             cornerRadius: 16
+    ///         )
+    ///     }
+    @discardableResult
+    func applyDiagonalGradient(
+        replacing existing: CAGradientLayer?,
+        from topLeft: UIColor,
+        to bottomRight: UIColor,
+        cornerRadius: CGFloat
+    ) -> CAGradientLayer {
+        existing?.removeFromSuperlayer()
+        let gl = CAGradientLayer()
+        gl.frame        = bounds
+        gl.cornerRadius = cornerRadius
+        gl.colors       = [topLeft.cgColor, bottomRight.cgColor]
+        gl.startPoint   = CGPoint(x: 0, y: 0)
+        gl.endPoint     = CGPoint(x: 1, y: 1)
+        layer.insertSublayer(gl, at: 0)
+        return gl
     }
 }

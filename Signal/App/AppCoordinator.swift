@@ -1,18 +1,7 @@
 // AppCoordinator.swift
 // Signal
 //
-// ─────────────────────────────────────────────────────────────────────────────
-// COORDINATOR PATTERN — WHY IT EXISTS
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// In a standard UIKit app, ViewControllers know about each other —
-// DashboardVC pushes TrendsVC, which pushes DetailVC, etc.
-// This makes VCs tightly coupled and hard to reuse or test.
-//
-// The Coordinator pattern fixes this by giving navigation responsibility
-// to a dedicated object. ViewControllers don't know what comes next —
-// they just call delegate methods or closures, and the Coordinator decides.
-//
+//  Created by Vishal Bhogal on 27/04/26.
 // Benefits:
 //   • ViewControllers become simple: they only manage their own view.
 //   • Navigation logic lives in one place — easy to change flows.
