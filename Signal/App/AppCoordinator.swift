@@ -110,7 +110,7 @@ final class AppCoordinator: Coordinator {
     }
     
     private func makeTrendsVC() -> UIViewController {
-        let vm = TrendsViewModel(healthService: healthService)
+        let vm = TrendsViewModel(healthService: healthService) // Swift UI + UIHostingVC
         return TrendsViewController(viewModel: vm)
     }
     

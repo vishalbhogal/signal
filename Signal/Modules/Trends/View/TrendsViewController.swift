@@ -16,7 +16,6 @@ final class TrendsViewController: UIViewController {
     private let viewModel: TrendsViewModel
     private var cancellables = Set<AnyCancellable>()
 
-    // A UIScrollView lets us stack multiple charts vertically and scroll through them.
     private let scrollView: UIScrollView = {
         let sv = UIScrollView()
         sv.translatesAutoresizingMaskIntoConstraints = false
@@ -85,9 +84,11 @@ final class TrendsViewController: UIViewController {
                 case .idle: break
                 case .loading:
                     self?.activityIndicator.startAnimating()
+                    
                 case .loaded(let snapshots):
                     self?.activityIndicator.stopAnimating()
                     self?.buildCharts(from: snapshots)
+                    
                 case .error(let msg):
                     self?.activityIndicator.stopAnimating()
                     print("Trends error: \(msg)")

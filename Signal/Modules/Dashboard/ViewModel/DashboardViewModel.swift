@@ -29,17 +29,9 @@
 
 import Foundation
 import Combine
-import UIKit   // StatItem carries UIColor — acceptable for UIKit-backed ViewModels
+import UIKit
 
 // MARK: - Stat Item
-//
-// Represents one "This Week" metric chip on the dashboard.
-// Lives here (not in the ViewController) because `buildStatItems(from:)` is
-// a data-transformation step that should be unit-testable without a live VC.
-//
-// Note: UIColor in a ViewModel is a pragmatic trade-off in UIKit apps.
-// In a cross-platform / SwiftUI architecture you'd use a semantic color key
-// and resolve it to UIColor in the cell.
 struct StatItem: Sendable {
     let title: String
     let value: String
@@ -62,9 +54,6 @@ extension StatItem: Hashable {
 }
 
 // MARK: - Dashboard State
-
-/// Represents every possible state of the dashboard screen.
-/// The VC switches on this enum to decide what to show.
 enum DashboardState {
     case idle                   // App just launched, nothing loaded yet
     case loading                // Async fetch is in progress
@@ -72,37 +61,26 @@ enum DashboardState {
     case error(String)          // Something went wrong — show error message
 }
 
-/// All the data the Dashboard screen needs, bundled together.
-/// Passing one struct is cleaner than many separate @Published properties.
+
 struct DashboardData {
     let riskScore: BurnoutRiskScore
     let snapshots: [DailyHealthSnapshot]
     let insights: [HealthInsight]
     let features: WeeklyBehavioralFeatures
-    // Pre-built by the ViewModel so the VC only needs to hand them to the data source.
     let statItems: [StatItem]
 }
 
 // MARK: - ViewModel
-
-/// Owns all business logic for the Dashboard screen.
-/// The ViewController only reads from this — it never fetches or processes data itself.
-@MainActor  // Ensures all @Published mutations happen on the main thread automatically
+@MainActor
 final class DashboardViewModel: ObservableObject {
-
     // MARK: Published State
-
-    /// The VC subscribes to $state and reacts to every change.
-    /// `private(set)` means only this class can write — VC can only read.
     @Published private(set) var state: DashboardState = .idle
-
+    
     // MARK: Dependencies
-
     private let healthService: HealthDataServiceProtocol
     private let riskEngine: BurnoutRiskEngineProtocol
 
     // MARK: Init
-
     init(healthService: HealthDataServiceProtocol,
          riskEngine: BurnoutRiskEngineProtocol) {
         self.healthService = healthService
@@ -110,8 +88,6 @@ final class DashboardViewModel: ObservableObject {
     }
 
     // MARK: - Data Loading
-
-    /// Called by the ViewController in viewDidLoad or on pull-to-refresh.
     func loadData() {
         state = .loading
 
@@ -119,26 +95,11 @@ final class DashboardViewModel: ObservableObject {
         // Without Task, you can't call `await` inside a regular function.
         Task {
             do {
-                // Fetch the raw daily snapshots — single source of truth.
-                // Features are then *derived* from this same array so sparklines
-                // and weekly averages are guaranteed to reflect identical data.
-                // (Previously fetchWeeklyFeatures() was called concurrently and
-                //  generated its own independent random dataset — a subtle bug.)
                 let snapshots = try await healthService.fetchWeeklySnapshots()
                 let features  = WeeklyBehavioralFeatures.compute(from: snapshots)
-
-                // Run Core ML inference with the aggregated weekly features.
                 let riskScore = try await riskEngine.predict(features: features)
-
-                // Generate text insight cards from the same features.
                 let insights = InsightGenerator.generateInsights(from: features)
-
-                // Build stat chip view-models here, not in the ViewController,
-                // so this transformation is covered by unit tests.
                 let statItems = Self.buildStatItems(from: features, snapshots: snapshots)
-
-                // Bundle everything and publish the loaded state.
-                // Because we're @MainActor, this is safe to do directly.
                 state = .loaded(DashboardData(
                     riskScore: riskScore,
                     snapshots: snapshots,
@@ -146,18 +107,13 @@ final class DashboardViewModel: ObservableObject {
                     features: features,
                     statItems: statItems
                 ))
-
             } catch {
-                // Any thrown error lands here — network, decoding, or ML errors.
                 state = .error(error.localizedDescription)
             }
         }
     }
 
     // MARK: - Stat Item Builder
-
-    /// Transforms raw health data into the view-model structs consumed by StatCell.
-    /// `static` so it can be called directly in unit tests without a ViewModel instance.
     static func buildStatItems(from features: WeeklyBehavioralFeatures,
                                snapshots: [DailyHealthSnapshot]) -> [StatItem] {
         // Sort oldest → newest so the sparkline reads left-to-right in time.
