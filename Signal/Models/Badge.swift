@@ -25,19 +25,9 @@ struct BadgeDefinition {
 }
 
 // MARK: - Badge Cache Key
-//
-// A type-safe enum for the keys we store in TwoLevelCache.
-// Using an enum instead of raw strings prevents typos like
-// "badge.visitcount" vs "badge.visitCount" causing silent cache misses.
-//
-// CustomStringConvertible is required by DiskCache so it can turn the key
-// into a filename (e.g. "visitCount.json" on disk).
 enum BadgeCacheKey: String, CustomStringConvertible {
     case visitCount = "visitCount"
     case earnedIDs  = "earnedIDs"
-
-    // `description` is what CustomStringConvertible requires.
-    // DiskCache calls "\(key)" which invokes this → becomes the JSON filename.
     var description: String { rawValue }
 }
 
@@ -64,12 +54,7 @@ enum BadgeCacheKey: String, CustomStringConvertible {
 // ─────────────────────────────────────────────────────────────────────────────
 
 final class BadgeStore {
-
-    // ── Singleton ─────────────────────────────────────────────────────────────
-    // Production code uses BadgeStore.shared so there is one counter for the app.
     static let shared = BadgeStore()
-
-    // ── Two caches, typed independently ──────────────────────────────────────
     private let visitCache: TwoLevelCache<BadgeCacheKey, Int>
     private let badgeCache: TwoLevelCache<BadgeCacheKey, [String]>
 
@@ -82,35 +67,22 @@ final class BadgeStore {
         badgeCache = TwoLevelCache(namespace: "\(namespace).earned")
     }
 
-    // ── Visit counter ─────────────────────────────────────────────────────────
-    // Reading goes through TwoLevelCache.get() — L1 then L2.
-    // First read after install: MISS → returns 0 (default).
-    // Subsequent reads same session: L1 HIT (memory, instant).
-    // Read after app restart: L1 MISS → L2 HIT (disk) → warms L1.
     var parkVisitCount: Int {
         get { visitCache.get(forKey: .visitCount) ?? 0 }
         set { visitCache.set(newValue, forKey: .visitCount) }
     }
 
-    // ── Earned badge IDs ──────────────────────────────────────────────────────
-    // Stored as [String] (Codable) and exposed as Set<String> (O(1) contains).
-    // First read: MISS → returns empty set (default).
     var earnedBadgeIDs: Set<String> {
-        // ?? [] handles the MISS case: no array on disk yet → empty set.
         Set(badgeCache.get(forKey: .earnedIDs) ?? [])
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
-    // Called by ExploreManager when the user taps "Check In".
     @discardableResult
     func recordParkVisit() -> [BadgeDefinition] {
-        parkVisitCount += 1      // write new count to both cache levels
+        parkVisitCount += 1
         return checkAndAward()
     }
 
-    // ── Private: badge unlock logic ───────────────────────────────────────────
     private func checkAndAward() -> [BadgeDefinition] {
-        // Read current state from the cache (will be an L1 HIT — we just wrote).
         let already = earnedBadgeIDs
         let count   = parkVisitCount
 
