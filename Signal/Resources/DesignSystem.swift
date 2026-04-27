@@ -255,4 +255,27 @@ extension UIView {
         // Force the tintColor as a fallback for older components
         tabBar.tintColor = activeColor
     }
+    
+    // Fixed background gradient — sits behind the scrolling collection view.
+    // Using a dedicated layer (not the collectionView background) means the
+    // gradient stays anchored to the screen while content scrolls over it.
+    static let backgroundGradientLayer: CAGradientLayer = {
+        let gl = CAGradientLayer()
+        
+        // 1. Top: Base background (clean for the header/dark card)
+        // 2. Bottom: Very pale, premium sage (grounds the colorful chips)
+        gl.colors = [
+            Signal.Colors.background.cgColor,
+            UIColor(red: 0.94, green: 0.97, blue: 0.95, alpha: 1.0).cgColor
+        ]
+        
+        // Start the fade about 40% down the screen, right below the main card
+        gl.locations = [0.4, 1.0]
+        
+        // True vertical fade (looks much cleaner behind scrollable lists than diagonal)
+        gl.startPoint = CGPoint(x: 0.5, y: 0.0)
+        gl.endPoint   = CGPoint(x: 0.5, y: 1.0)
+        
+        return gl
+    }()
 }

@@ -19,7 +19,6 @@ final class SectionHeaderView: UICollectionReusableView {
         return l
     }()
 
-    // 3×20pt brand-green underline accent below the title.
     private let underline: UIView = {
         let v = UIView()
         v.backgroundColor    = Signal.Colors.brandGreen

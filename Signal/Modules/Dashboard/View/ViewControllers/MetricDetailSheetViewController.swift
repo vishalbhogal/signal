@@ -2,26 +2,18 @@
 // Signal
 //
 //  Created by Vishal Bhogal on 27/04/26.
-// Modal sheet that slides up when the user taps a stat chip.
-// Shows the full 7-day sparkline at a readable size, a per-day breakdown
-// table, and a one-line interpretation comparing the week's average to
-// the recommended baseline for that metric.
 
 import UIKit
 
 final class MetricDetailSheetViewController: UIViewController {
 
     // MARK: - Data
-
     private let stat: StatItem
-    // Snapshots are passed in sorted oldest → newest from the dashboard.
     private let snapshots: [DailyHealthSnapshot]
 
     // MARK: - Init
-
     init(stat: StatItem, snapshots: [DailyHealthSnapshot]) {
         self.stat = stat
-        // Ensure correct time order regardless of caller.
         self.snapshots = snapshots.sorted { $0.date < $1.date }
         super.init(nibName: nil, bundle: nil)
     }
@@ -29,7 +21,6 @@ final class MetricDetailSheetViewController: UIViewController {
     required init?(coder: NSCoder) { fatalError("Use init(stat:snapshots:)") }
 
     // MARK: - Views
-
     private let scrollView: UIScrollView = {
         let sv = UIScrollView()
         sv.translatesAutoresizingMaskIntoConstraints = false
@@ -69,7 +60,6 @@ final class MetricDetailSheetViewController: UIViewController {
             contentStack.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 20),
             contentStack.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -20),
             contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -40),
-            // Pin width so the stack doesn't grow horizontally inside the scroll view.
             contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -40)
         ])
     }
@@ -82,8 +72,6 @@ final class MetricDetailSheetViewController: UIViewController {
     }
 
     // MARK: - Section builders
-
-    /// Large icon pill + metric name + current-week average value.
     private func makeHeader() -> UIView {
         let container = UIView()
 
@@ -154,8 +142,6 @@ final class MetricDetailSheetViewController: UIViewController {
         header.font      = .systemFont(ofSize: 12, weight: .semibold)
         header.textColor = Signal.Colors.textSecondary
         header.translatesAutoresizingMaskIntoConstraints = false
-
-        // Reuse the existing SparklineView — just render it at a larger size.
         let sparkline = SparklineView()
         sparkline.lineColor  = stat.iconColor
         sparkline.values     = stat.sparklineValues

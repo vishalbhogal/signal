@@ -2,30 +2,6 @@
 // Signal
 //
 //  Created by Vishal Bhogal on 27/04/26.
-// ─────────────────────────────────────────────────────────────────────────────
-// COMBINE — WHY IT'S USED HERE
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// Combine is Apple's reactive framework. Instead of the ViewController
-// asking "what's the data right now?", it *subscribes* to publishers
-// on the ViewModel and is automatically notified when data changes.
-//
-// Key concepts used below:
-//
-//   @Published var x: T
-//     Creates a Publisher that emits a new value every time `x` is set.
-//     The ViewController subscribes to $x (the projected value).
-//
-//   AnyCancellable
-//     A token returned by .sink() or .assign(). As long as you hold it,
-//     the subscription stays alive. When it's deallocated, the subscription
-//     is cancelled — preventing zombie subscriptions.
-//
-//   .receive(on: DispatchQueue.main)
-//     Ensures UI updates happen on the main thread, because UIKit is not
-//     thread-safe. Async work runs on background threads; this hops back.
-//
-// ─────────────────────────────────────────────────────────────────────────────
 
 import Foundation
 import Combine
@@ -90,9 +66,6 @@ final class DashboardViewModel: ObservableObject {
     // MARK: - Data Loading
     func loadData() {
         state = .loading
-
-        // Task { } creates a new async context from a sync context.
-        // Without Task, you can't call `await` inside a regular function.
         Task {
             do {
                 let snapshots = try await healthService.fetchWeeklySnapshots()

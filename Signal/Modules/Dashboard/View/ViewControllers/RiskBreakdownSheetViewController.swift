@@ -273,7 +273,6 @@ final class RiskBreakdownSheetViewController: UIViewController {
 
     /// Computes sub-scores using the same formula as MockBurnoutRiskEngine.
     private func contributors() -> [Contributor] {
-        // Mirror the formulas from BurnoutRiskEngine.swift exactly.
         let sleepScore = max(0, (8.0 - features.avgSleepHours) / 8.0)
         let hrvScore   = max(0, (70.0 - features.avgHRV) / 70.0)
         let workScore  = min(1.0, max(0, (features.avgWorkHours - 8.0) / 6.0))
