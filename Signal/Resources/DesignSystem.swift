@@ -218,4 +218,41 @@ extension UIView {
         layer.insertSublayer(gl, at: 0)
         return gl
     }
+    
+    /// Configures the frosted glass background and custom active/inactive colors
+    static func applyTabBarStyling(to tabBar: UITabBar) {
+        let appearance = UITabBarAppearance()
+        
+        // 1. Frosted glass background
+        appearance.configureWithDefaultBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemChromeMaterial)
+        appearance.shadowColor = .clear // Removes the harsh top border line
+        
+        // 2. Colors: Deep green (Active) and Slate (Inactive)
+        let activeColor = UIColor(red: 30/255, green: 63/255, blue: 47/255, alpha: 1.0)
+        let inactiveColor = UIColor.secondaryLabel
+        
+        // 3. Normal (Inactive) State
+        appearance.stackedLayoutAppearance.normal.iconColor = inactiveColor
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
+            .foregroundColor: inactiveColor,
+            .font: UIFont.systemFont(ofSize: 10, weight: .medium)
+        ]
+        
+        // 4. Selected (Active) State
+        appearance.stackedLayoutAppearance.selected.iconColor = activeColor
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
+            .foregroundColor: activeColor,
+            .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+        ]
+        
+        // 5. Apply to the actual tab bar
+        tabBar.standardAppearance = appearance
+        if #available(iOS 15.0, *) {
+            tabBar.scrollEdgeAppearance = appearance
+        }
+        
+        // Force the tintColor as a fallback for older components
+        tabBar.tintColor = activeColor
+    }
 }
